@@ -1,0 +1,14 @@
+{
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "Task Tracker Local",
+            "database": "task_tracker_poc",
+            "username": "postgres"
+        }
+    ]
+}
