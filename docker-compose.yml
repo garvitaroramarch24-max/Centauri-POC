@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: local_postgres_password
+      POSTGRES_DB: task_tracker_poc
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: local_postgres_password
+      DB_NAME: task_tracker_poc
+      FRONTEND_ORIGIN: http://localhost:5173
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:

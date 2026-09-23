@@ -1,9 +1,97 @@
-import React, { useState, useEffect } from 'react';
-import type { Task, AuthState } from './types';
+import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { LogIn, LogOut, Plus, Trash2, CheckCircle, Circle, Edit2, Save, X } from 'lucide-react';
+import {
+  LogIn,
+  LogOut,
+  Plus,
+  Trash2,
+  CheckCircle,
+  Circle,
+  Edit2,
+  Save,
+  X,
+  Zap,
+} from 'lucide-react';
+import type { Task, AuthState } from './types';
 
-const API_URL = 'http://localhost:3000/tasks';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/tasks';
+
+// Sophisticated design tokens
+const colors = {
+  bg: '#fafaf9',
+  surface: '#ffffff',
+  text: '#1a1a1a',
+  textMuted: '#666666',
+  border: '#e5e5e5',
+  accentBlue: '#0066ff',
+  accentGreen: '#00a854',
+  accentRed: '#d63031',
+  accentOrange: '#ff7a45',
+} as const;
+
+const styles = {
+  card: {
+    background: colors.surface,
+    borderRadius: '10px',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+    transition: 'all 0.2s ease',
+  },
+  input: {
+    width: '100%',
+    padding: '0.875rem',
+    borderRadius: '8px',
+    border: `1.5px solid ${colors.border}`,
+    boxSizing: 'border-box',
+    fontSize: '0.95rem',
+    fontFamily: 'inherit',
+    color: colors.text,
+    transition: 'all 0.2s ease',
+  },
+  buttonPrimary: {
+    background: colors.accentBlue,
+    color: '#fff',
+    padding: '0.875rem 1.5rem',
+    borderRadius: '8px',
+    border: 'none',
+    fontWeight: 600,
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  buttonSuccess: {
+    background: colors.accentGreen,
+    color: '#fff',
+    padding: '0.75rem 1.25rem',
+    borderRadius: '8px',
+    border: 'none',
+    fontWeight: 600,
+    fontSize: '0.9rem',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  buttonDanger: {
+    background: colors.accentRed,
+    color: '#fff',
+    border: 'none',
+    padding: '0.625rem 1rem',
+    borderRadius: '8px',
+    fontWeight: 600,
+    fontSize: '0.9rem',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  iconButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    borderRadius: '6px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+  },
+} as const;
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState>({ token: null, user: null });
@@ -13,30 +101,40 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
+
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const { data } = await axios.get<Task[]>(API_URL);
+      setTasks(data);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
+  }, []);
 
   useEffect(() => {
     if (auth.token) {
       fetchTasks();
     }
-  }, [auth.token]);
-
-  const fetchTasks = async () => {
-    try {
-      const response = await axios.get<Task[]>(API_URL);
-      setTasks(response.data);
-    } catch (error) {
-      console.error('Error fetching tasks from PostgreSQL:', error);
-    }
-  };
+  }, [auth.token, fetchTasks]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim() && password.trim()) {
-      setAuth({ token: 'mock-jwt-token', user: { username } });
-    }
+
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanUsername || !cleanPassword) return;
+
+    setAuth({
+      token: 'mock-jwt-token',
+      user: { username: cleanUsername },
+    });
   };
 
   const handleLogout = () => {
@@ -44,18 +142,24 @@ export default function App() {
     setTasks([]);
     setUsername('');
     setPassword('');
+    setEditingId(null);
+    setEditTitle('');
+    setEditDesc('');
   };
 
   const createTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+
+    const title = newTitle.trim();
+    if (!title) return;
 
     try {
-      const response = await axios.post<Task>(API_URL, {
-        title: newTitle,
-        description: newDesc,
+      const { data } = await axios.post<Task>(API_URL, {
+        title,
+        description: newDesc.trim(),
       });
-      setTasks([response.data, ...tasks]);
+
+      setTasks((prev) => [data, ...prev]);
       setNewTitle('');
       setNewDesc('');
     } catch (error) {
@@ -64,14 +168,17 @@ export default function App() {
   };
 
   const toggleTask = async (id: string) => {
-    const taskToToggle = tasks.find(t => t.id === id);
+    const taskToToggle = tasks.find((task) => task.id === id);
     if (!taskToToggle) return;
 
     try {
-      const response = await axios.patch<Task>(`${API_URL}/${id}`, {
+      const { data } = await axios.patch<Task>(`${API_URL}/${id}`, {
         isCompleted: !taskToToggle.isCompleted,
       });
-      setTasks(tasks.map(t => t.id === id ? response.data : t));
+
+      setTasks((prev) =>
+        prev.map((task) => (task.id === id ? data : task))
+      );
     } catch (error) {
       console.error('Error updating task status:', error);
     }
@@ -83,14 +190,26 @@ export default function App() {
     setEditDesc(task.description ?? '');
   };
 
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+    setEditDesc('');
+  };
+
   const saveUpdate = async (id: string) => {
+    const title = editTitle.trim();
+    if (!title) return;
+
     try {
-      const response = await axios.patch<Task>(`${API_URL}/${id}`, {
-        title: editTitle,
-        description: editDesc,
+      const { data } = await axios.patch<Task>(`${API_URL}/${id}`, {
+        title,
+        description: editDesc.trim(),
       });
-      setTasks(tasks.map(t => t.id === id ? response.data : t));
-      setEditingId(null);
+
+      setTasks((prev) =>
+        prev.map((task) => (task.id === id ? data : task))
+      );
+      cancelEdit();
     } catch (error) {
       console.error('Error saving task updates:', error);
     }
@@ -99,7 +218,7 @@ export default function App() {
   const deleteTask = async (id: string) => {
     try {
       await axios.delete(`${API_URL}/${id}`);
-      setTasks(tasks.filter(t => t.id !== id));
+      setTasks((prev) => prev.filter((task) => task.id !== id));
     } catch (error) {
       console.error('Error deleting task:', error);
     }
@@ -107,280 +226,584 @@ export default function App() {
 
   if (!auth.token) {
     return (
-      <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', marginTop: '4rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-          <LogIn size={24} color="#4f46e5" />
-          <h2 style={{ margin: 0 }}>Task Tracker POC Login</h2>
+      <div
+        style={{
+          background: `linear-gradient(135deg, ${colors.bg} 0%, #f5f5f5 100%)`,
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+        }}
+      >
+        <div
+          style={{
+            ...styles.card,
+            maxWidth: '420px',
+            width: '100%',
+            padding: '2.5rem',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '2rem',
+            }}
+          >
+            <div
+              style={{
+                background: colors.accentBlue,
+                width: '40px',
+                height: '40px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Zap size={22} color="#fff" strokeWidth={2.5} />
+            </div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '1.5rem',
+                fontWeight: 700,
+                color: colors.text,
+                letterSpacing: '-0.5px',
+              }}
+            >
+              Task Pro
+            </h1>
+          </div>
+
+          <form
+            onSubmit={handleLogin}
+            style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+          >
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  marginBottom: '0.5rem',
+                  color: colors.text,
+                }}
+              >
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
+                required
+                style={styles.input}
+                onFocus={(e) =>
+                  (e.target.style.borderColor = colors.accentBlue)
+                }
+                onBlur={(e) =>
+                  (e.target.style.borderColor = colors.border)
+                }
+              />
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  marginBottom: '0.5rem',
+                  color: colors.text,
+                }}
+              >
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                style={styles.input}
+                onFocus={(e) =>
+                  (e.target.style.borderColor = colors.accentBlue)
+                }
+                onBlur={(e) =>
+                  (e.target.style.borderColor = colors.border)
+                }
+              />
+            </div>
+
+            <button
+              type="submit"
+              style={{
+                ...styles.buttonPrimary,
+                opacity: username.trim() && password.trim() ? 1 : 0.6,
+                marginTop: '0.5rem',
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.transform = 'translateY(-2px)')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = 'translateY(0)')
+              }
+            >
+              Sign In
+            </button>
+          </form>
+
+          <p
+            style={{
+              fontSize: '0.8rem',
+              color: colors.textMuted,
+              marginTop: '1.5rem',
+              textAlign: 'center',
+              margin: '1.5rem 0 0 0',
+            }}
+          >
+            Try any username and password to get started
+          </p>
         </div>
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem' }}>Username</label>
-            <input type="text" title="Username input field" placeholder="Enter username..." value={username} onChange={(e) => setUsername(e.target.value)} required style={{ width: '95%', padding: '0.625rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem' }}>Password</label>
-            <input type="password" title="Password input field" placeholder="Enter password..." value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '95%', padding: '0.625rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-          </div>
-          <button type="submit" style={{ background: '#4f46e5', color: '#fff', padding: '0.75rem', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', marginTop: '0.5rem' }}>
-            Sign In
-          </button>
-        </form>
       </div>
     );
   }
 
+  const completedCount = tasks.filter((t) => t.isCompleted).length;
+
   return (
-    <div>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', background: '#fff', padding: '1rem', borderRadius: '12px', boxShadow: '0 1px 3px rgb(0 0 0 / 0.1)' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a' }}>Task Dashboard</h1>
-          <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Welcome, {auth.user?.username}</span>
-        </div>
-        <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#ef4444', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}>
-          <LogOut size={16} /> Logout
-        </button>
-      </header>
+    <div
+      style={{
+        background: colors.bg,
+        minHeight: '100vh',
+        paddingTop: '1.5rem',
+        paddingBottom: '3rem',
+      }}
+    >
+      <div style={{ maxWidth: '680px', margin: '0 auto', padding: '0 1rem' }}>
+        {/* Header */}
+        <header
+          style={{
+            ...styles.card,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '1.5rem',
+            marginBottom: '2.5rem',
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '1.75rem',
+                fontWeight: 700,
+                color: colors.text,
+                letterSpacing: '-0.5px',
+              }}
+            >
+              Tasks
+            </h1>
+            <p
+              style={{
+                margin: '0.5rem 0 0 0',
+                fontSize: '0.875rem',
+                color: colors.textMuted,
+              }}
+            >
+              Welcome back, <strong>{auth.user?.username}</strong>
+            </p>
+          </div>
 
-      <section style={{ background: '#fff', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', boxShadow: '0 1px 3px rgb(0 0 0 / 0.1)' }}>
-        <h3 style={{ margin: '0 0 1rem 0', color: '#334155' }}>Create New Task</h3>
-        <form onSubmit={createTask} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <input type="text" title="New task title input" placeholder="Task Title..." value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required style={{ padding: '0.625rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-          <textarea title="New task description details" placeholder="Description Details (Optional)..." value={newDesc} onChange={(e) => setNewDesc(e.target.value)} rows={2} style={{ padding: '0.625rem', borderRadius: '6px', border: '1px solid #cbd5e1', resize: 'none' }} />
-          <button type="submit" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: '#10b981', color: '#fff', padding: '0.625rem', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
-            <Plus size={18} /> Add Task
+          <button
+            onClick={handleLogout}
+            style={{
+              ...styles.buttonDanger,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.opacity = '0.85')
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.opacity = '1')
+            }
+          >
+            <LogOut size={16} />
+            Logout
           </button>
-        </form>
-      </section>
+        </header>
 
-      <main style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {tasks.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#64748b', marginTop: '2rem' }}>No tasks found in the database. Add one above!</p>
-        ) : (
-          tasks.map(task => (
-            <div key={task.id} style={{ background: '#fff', padding: '1.25rem', borderRadius: '12px', borderLeft: task.isCompleted ? '4px solid #10b981' : '4px solid #6366f1', boxShadow: '0 1px 3px rgb(0 0 0 / 0.1)', display: 'flex', gap: '1rem', alignItems: 'start' }}>
-              
-              <button onClick={() => toggleTask(task.id)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginTop: '0.2rem', color: task.isCompleted ? '#10b981' : '#cbd5e1' }} title={task.isCompleted ? "Mark task incomplete" : "Mark task complete"}>
-                {task.isCompleted ? <CheckCircle size={22} /> : <Circle size={22} />}
-              </button>
-
-              <div style={{ flexGrow: 1 }}>
-                {editingId === task.id ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <input type="text" title="Edit active task title input" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 600 }} />
-                    <textarea title="Edit active task description input" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '4px', resize: 'none' }} />
-                  </div>
-                ) : (
-                  <>
-                    <h4 style={{ margin: 0, fontSize: '1.1rem', textDecoration: task.isCompleted ? 'line-through' : 'none', color: task.isCompleted ? '#64748b' : '#1e293b' }}>
-                      {task.title}
-                    </h4>
-                    {task.description && <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.9rem', color: '#475569' }}>{task.description}</p>}
-                  </>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {editingId === task.id ? (
-                  <>
-                    <button onClick={() => saveUpdate(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10b981' }} title="Save"><Save size={18} /></button>
-                    <button onClick={() => setEditingId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }} title="Cancel"><X size={18} /></button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => startEdit(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }} title="Edit"><Edit2 size={18} /></button>
-                    <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }} title="Delete"><Trash2 size={18} /></button>
-                  </>
-                )}
-              </div>
-
+        {/* Stats */}
+        {tasks.length > 0 && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '1rem',
+              marginBottom: '2rem',
+            }}
+          >
+            <div
+              style={{
+                ...styles.card,
+                padding: '1.25rem',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ margin: 0, fontSize: '0.875rem', color: colors.textMuted }}>
+                Total Tasks
+              </p>
+              <p
+                style={{
+                  margin: '0.5rem 0 0 0',
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  color: colors.accentBlue,
+                }}
+              >
+                {tasks.length}
+              </p>
             </div>
-          ))
+            <div
+              style={{
+                ...styles.card,
+                padding: '1.25rem',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ margin: 0, fontSize: '0.875rem', color: colors.textMuted }}>
+                Completed
+              </p>
+              <p
+                style={{
+                  margin: '0.5rem 0 0 0',
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  color: colors.accentGreen,
+                }}
+              >
+                {completedCount}
+              </p>
+            </div>
+          </div>
         )}
-      </main>
+
+        {/* Create Task Section */}
+        <section
+          style={{
+            ...styles.card,
+            padding: '2rem',
+            marginBottom: '2.5rem',
+          }}
+        >
+          <h2
+            style={{
+              margin: '0 0 1.5rem 0',
+              fontSize: '1.1rem',
+              fontWeight: 700,
+              color: colors.text,
+            }}
+          >
+            New Task
+          </h2>
+
+          <form
+            onSubmit={createTask}
+            style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
+          >
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="What needs to be done?"
+              required
+              style={styles.input}
+              onFocus={(e) =>
+                (e.target.style.borderColor = colors.accentBlue)
+              }
+              onBlur={(e) =>
+                (e.target.style.borderColor = colors.border)
+              }
+            />
+
+            <textarea
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+              placeholder="Add details (optional)"
+              rows={2}
+              style={{
+                ...styles.input,
+                resize: 'none',
+                minHeight: '80px',
+              }}
+              onFocus={(e) =>
+                (e.target.style.borderColor = colors.accentBlue)
+              }
+              onBlur={(e) =>
+                (e.target.style.borderColor = colors.border)
+              }
+            />
+
+            <button
+              type="submit"
+              disabled={!newTitle.trim()}
+              style={{
+                ...styles.buttonSuccess,
+                opacity: newTitle.trim() ? 1 : 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+              }}
+              onMouseEnter={(e) =>
+                newTitle.trim() &&
+                (e.currentTarget.style.transform = 'translateY(-2px)')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.transform = 'translateY(0)')
+              }
+            >
+              <Plus size={18} />
+              Add Task
+            </button>
+          </form>
+        </section>
+
+        {/* Tasks List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {tasks.length === 0 ? (
+            <div
+              style={{
+                ...styles.card,
+                padding: '3rem 2rem',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ margin: 0, color: colors.textMuted, fontSize: '1rem' }}>
+                No tasks yet. Create one above to get started.
+              </p>
+            </div>
+          ) : (
+            tasks.map((task) => {
+              const isEditing = editingId === task.id;
+              const isHovered = hoveredTaskId === task.id;
+
+              return (
+                <div
+                  key={task.id}
+                  style={{
+                    ...styles.card,
+                    padding: '1.25rem',
+                    borderLeft: `3px solid ${
+                      task.isCompleted ? colors.accentGreen : colors.accentBlue
+                    }`,
+                    display: 'flex',
+                    gap: '1rem',
+                    alignItems: 'flex-start',
+                    opacity: task.isCompleted ? 0.7 : 1,
+                    transform: isHovered ? 'translateX(4px)' : 'translateX(0)',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={() => setHoveredTaskId(task.id)}
+                  onMouseLeave={() => setHoveredTaskId(null)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleTask(task.id)}
+                    title={
+                      task.isCompleted
+                        ? 'Mark incomplete'
+                        : 'Mark complete'
+                    }
+                    style={{
+                      ...styles.iconButton,
+                      marginTop: '0.25rem',
+                      color: task.isCompleted
+                        ? colors.accentGreen
+                        : colors.border,
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!task.isCompleted) {
+                        e.currentTarget.style.color = colors.accentGreen;
+                        e.currentTarget.style.background = 'rgba(0, 168, 84, 0.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = task.isCompleted
+                        ? colors.accentGreen
+                        : colors.border;
+                      e.currentTarget.style.background = 'none';
+                    }}
+                  >
+                    {task.isCompleted ? (
+                      <CheckCircle size={22} strokeWidth={2} />
+                    ) : (
+                      <Circle size={22} strokeWidth={1.5} />
+                    )}
+                  </button>
+
+                  <div style={{ flexGrow: 1 }}>
+                    {isEditing ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem',
+                        }}
+                      >
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          style={{
+                            ...styles.input,
+                            fontWeight: 600,
+                            fontSize: '1rem',
+                          }}
+                          autoFocus
+                        />
+                        <textarea
+                          value={editDesc}
+                          onChange={(e) => setEditDesc(e.target.value)}
+                          rows={2}
+                          style={{
+                            ...styles.input,
+                            resize: 'none',
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <h4
+                          style={{
+                            margin: 0,
+                            fontSize: '1rem',
+                            fontWeight: 600,
+                            color: colors.text,
+                            textDecoration: task.isCompleted
+                              ? 'line-through'
+                              : 'none',
+                            opacity: task.isCompleted ? 0.6 : 1,
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          {task.title}
+                        </h4>
+
+                        {task.description && (
+                          <p
+                            style={{
+                              margin: '0.5rem 0 0 0',
+                              fontSize: '0.875rem',
+                              color: colors.textMuted,
+                              opacity: task.isCompleted ? 0.5 : 0.8,
+                              lineHeight: '1.4',
+                            }}
+                          >
+                            {task.description}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => saveUpdate(task.id)}
+                          style={{
+                            ...styles.iconButton,
+                            color: colors.accentGreen,
+                          }}
+                          title="Save"
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background =
+                              'rgba(0, 168, 84, 0.1)')
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background = 'none')
+                          }
+                        >
+                          <Save size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          style={{
+                            ...styles.iconButton,
+                            color: colors.accentRed,
+                          }}
+                          title="Cancel"
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background =
+                              'rgba(214, 48, 49, 0.1)')
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background = 'none')
+                          }
+                        >
+                          <X size={18} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(task)}
+                          style={{
+                            ...styles.iconButton,
+                            color: colors.textMuted,
+                          }}
+                          title="Edit"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = colors.accentBlue;
+                            e.currentTarget.style.background =
+                              'rgba(0, 102, 255, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = colors.textMuted;
+                            e.currentTarget.style.background = 'none';
+                          }}
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteTask(task.id)}
+                          style={{
+                            ...styles.iconButton,
+                            color: colors.textMuted,
+                          }}
+                          title="Delete"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = colors.accentRed;
+                            e.currentTarget.style.background =
+                              'rgba(214, 48, 49, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = colors.textMuted;
+                            e.currentTarget.style.background = 'none';
+                          }}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
     </div>
   );
 }
-
-// src/App.tsx
-// import React, { useState } from 'react';
-// import type {Task, AuthState}  from './types'
-// import { LogIn, LogOut, Plus, Trash2, CheckCircle, Circle, Edit2, Save, X } from 'lucide-react';
-
-// export default function App() {
-//   // Auth State (Mocking basic auth flow for API parity later)
-//   const [auth, setAuth] = useState<AuthState>({ token: null, user: null });
-//   const [username, setUsername] = useState('');
-//   const [password, setPassword] = useState('');
-
-//   // Tasks State
-//   const [tasks, setTasks] = useState<Task[]>([
-//     { id: '1', title: 'Setup NestJS Backend', description: 'Initialize repository with modules, controllers, and TypeORM', isCompleted: false, createdAt: new Date().toISOString() },
-//     { id: '2', title: 'Configure Vite Frontend', description: 'Scaffold React + TS base structure', isCompleted: true, createdAt: new Date().toISOString() }
-//   ]);
-
-//   // Form Inputs
-//   const [newTitle, setNewTitle] = useState('');
-//   const [newDesc, setNewDesc] = useState('');
-//   const [editingId, setEditingId] = useState<string | null>(null);
-//   const [editTitle, setEditTitle] = useState('');
-//   const [editDesc, setEditDesc] = useState('');
-
-//   // Handle Mock Login
-//   const handleLogin = (e: React.FormEvent) => {
-//     e.preventDefault();
-//     if (username.trim() && password.trim()) {
-//       setAuth({ token: 'mock-jwt-token', user: { username } });
-//     }
-//   };
-
-//   // Handle Mock Logout
-//   const handleLogout = () => {
-//     setAuth({ token: null, user: null });
-//     setUsername('');
-//     setPassword('');
-//   };
-
-//   // CRUD: Create Task
-//   const createTask = (e: React.FormEvent) => {
-//     e.preventDefault();
-//     if (!newTitle.trim()) return;
-
-//     const newTask: Task = {
-//       id: crypto.randomUUID(),
-//       title: newTitle,
-//       description: newDesc,
-//       isCompleted: false,
-//       createdAt: new Date().toISOString()
-//     };
-
-//     setTasks([newTask, ...tasks]);
-//     setNewTitle('');
-//     setNewDesc('');
-//   };
-
-//   // CRUD: Toggle Completion Update
-//   const toggleTask = (id: string) => {
-//     setTasks(tasks.map(t => t.id === id ? { ...t, isCompleted: !t.isCompleted } : t));
-//   };
-
-//   // CRUD: Init Edit Mode
-//   const startEdit = (task: Task) => {
-//     setEditingId(task.id);
-//     setEditTitle(task.title);
-//     setEditDesc(task.description);
-//   };
-
-//   // CRUD: Save Inline Update
-//   const saveUpdate = (id: string) => {
-//     setTasks(tasks.map(t => t.id === id ? { ...t, title: editTitle, description: editDesc } : t));
-//     setEditingId(null);
-//   };
-
-//   // CRUD: Delete Task
-//   const deleteTask = (id: string) => {
-//     setTasks(tasks.filter(t => t.id !== id));
-//   };
-
-//   // ------------------ CONDITIONAL RENDER: AUTH GUARD ------------------
-//   if (!auth.token) {
-//     return (
-//       <div style={{ background: '#fff', padding: '2rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', marginTop: '4rem' }}>
-//         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-//           <LogIn size={24} color="#4f46e5" />
-//           <h2 style={{ margin: 0 }}>Task Tracker POC Login</h2>
-//         </div>
-//         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-//           <div>
-//             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem' }}>Username</label>
-//             <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required style={{ width: '95%', padding: '0.625rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-//           </div>
-//           <div>
-//             <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem' }}>Password</label>
-//             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required style={{ width: '95%', padding: '0.625rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-//           </div>
-//           <button type="submit" style={{ background: '#4f46e5', color: '#fff', padding: '0.75rem', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', marginTop: '0.5rem' }}>
-//             Sign In
-//           </button>
-//         </form>
-//       </div>
-//     );
-//   }
-
-//   // ------------------ CONDITIONAL RENDER: DASHBOARD ------------------
-//   return (
-//     <div>
-//       {/* Top Header Row */}
-//       <header style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '2rem', background: '#fff', padding: '1rem', borderRadius: '12px', boxShadow: '0 1px 3px rgb(0 0 0 / 0.1)' }}>
-//         <div>
-//           <h1 style={{ margin: 0, fontSize: '1.5rem', color: '#0f172a' }}>Task Dashboard</h1>
-//           <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Welcome, {auth.user?.username}</span>
-//         </div>
-//         <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#ef4444', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}>
-//           <LogOut size={16} /> Logout
-//         </button>
-//       </header>
-
-//       {/* Task Creation Form */}
-//       <section style={{ background: '#fff', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', boxShadow: '0 1px 3px rgb(0 0 0 / 0.1)' }}>
-//         <h3 style={{ margin: '0 0 1rem 0', color: '#334155' }}>Create New Task</h3>
-//         <form onSubmit={createTask} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-//           <input type="text" placeholder="Task Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required style={{ padding: '0.625rem', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-//           <textarea placeholder="Description (Optional)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} rows={2} style={{ padding: '0.625rem', borderRadius: '6px', border: '1px solid #cbd5e1', resize: 'none' }} />
-//           <button type="submit" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: '#10b981', color: '#fff', padding: '0.625rem', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer' }}>
-//             <Plus size={18} /> Add Task
-//           </button>
-//         </form>
-//       </section>
-
-//       {/* Task List Feed */}
-//       <main style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-//         {tasks.length === 0 ? (
-//           <p style={{ textAlign: 'center', color: '#64748b', marginTop: '2rem' }}>No tasks tracked yet. Add one above!</p>
-//         ) : (
-//           tasks.map(task => (
-//             <div key={task.id} style={{ background: '#fff', padding: '1.25rem', borderRadius: '12px', borderLeft: task.isCompleted ? '4px solid #10b981' : '4px solid #6366f1', boxShadow: '0 1px 3px rgb(0 0 0 / 0.1)', display: 'flex', gap: '1rem', alignItems: 'start' }}>
-              
-//               {/* Checkbox Trigger */}
-//               <button onClick={() => toggleTask(task.id)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', marginTop: '0.2rem', color: task.isCompleted ? '#10b981' : '#cbd5e1' }}>
-//                 {task.isCompleted ? <CheckCircle size={22} /> : <Circle size={22} />}
-//               </button>
-
-//               {/* Text Layout Block (Conditional Inline Edit) */}
-//               <div style={{ flexGrow: 1 }}>
-//                 {editingId === task.id ? (
-//                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-//                     <input type="text"  value={editTitle} onChange={(e) => setEditTitle(e.target.value)} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '4px', fontWeight: 600 }} />
-//                     <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} style={{ padding: '0.4rem', border: '1px solid #cbd5e1', borderRadius: '4px', resize: 'none' }} />
-//                   </div>
-//                 ) : (
-//                   <>
-//                     <h4 style={{ margin: 0, fontSize: '1.1rem', textDecoration: task.isCompleted ? 'line-through' : 'none', color: task.isCompleted ? '#64748b' : '#1e293b' }}>
-//                       {task.title}
-//                     </h4>
-//                     {task.description && <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.9rem', color: '#475569' }}>{task.description}</p>}
-//                   </>
-//                 )}
-//               </div>
-
-//               {/* Action Buttons */}
-//               <div style={{ display: 'flex', gap: '0.5rem' }}>
-//                 {editingId === task.id ? (
-//                   <>
-//                     <button onClick={() => saveUpdate(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#10b981' }} title="Save Changes"><Save size={18} /></button>
-//                     <button onClick={() => setEditingId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }} title="Cancel"><X size={18} /></button>
-//                   </>
-//                 ) : (
-//                   <>
-//                     <button onClick={() => startEdit(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }} title="Edit"><Edit2 size={18} /></button>
-//                     <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }} title="Delete"><Trash2 size={18} /></button>
-//                   </>
-//                 )}
-//               </div>
-
-//             </div>
-//           ))
-//         )}
-//       </main>
-//     </div>
-//   );
-// }

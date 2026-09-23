@@ -10,5 +10,6 @@
             "database": "task_tracker_poc",
             "username": "postgres"
         }
-    ]
+    ],
+    "github.copilot.llm-gateway.serverUrl": "http://localhost:8000"
 }
