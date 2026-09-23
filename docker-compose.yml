@@ -20,6 +20,7 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: local_postgres_password
       DB_NAME: task_tracker_poc
+      JWT_SECRET: local-development-jwt-secret-change-me
       FRONTEND_ORIGIN: http://localhost:5173
     depends_on:
       - db

@@ -1,5 +1,6 @@
 
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { UserEntity } from '../auth/user.entity.js';
 
 @Entity('tasks') // This tells TypeORM to name the table "tasks" inside PostgreSQL
 export class TaskEntity {
@@ -17,4 +18,7 @@ export class TaskEntity {
 
   @CreateDateColumn() // Automatically timestamps when the task is added
   createdAt: Date;
+
+  @ManyToOne(() => UserEntity, (user) => user.tasks, { onDelete: 'CASCADE' })
+  owner: UserEntity;
 }

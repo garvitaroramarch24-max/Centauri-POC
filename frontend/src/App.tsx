@@ -14,7 +14,9 @@ import {
 } from 'lucide-react';
 import type { Task, AuthState } from './types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/tasks';
+const API_ROOT = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = `${API_ROOT}/tasks`;
+const AUTH_URL = `${API_ROOT}/auth`;
 
 // Sophisticated design tokens
 const colors = {
@@ -94,7 +96,15 @@ const styles = {
 } as const;
 
 export default function App() {
-  const [auth, setAuth] = useState<AuthState>({ token: null, user: null });
+  const [auth, setAuth] = useState<AuthState>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('task-tracker-auth') ?? '{"token":null,"user":null}');
+    } catch {
+      return { token: null, user: null };
+    }
+  });
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authError, setAuthError] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -110,12 +120,14 @@ export default function App() {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const { data } = await axios.get<Task[]>(API_URL);
+      const { data } = await axios.get<Task[]>(API_URL, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
       setTasks(data);
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
-  }, []);
+  }, [auth.token]);
 
   useEffect(() => {
     if (auth.token) {
@@ -123,22 +135,34 @@ export default function App() {
     }
   }, [auth.token, fetchTasks]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
     if (!cleanUsername || !cleanPassword) return;
+    setAuthError('');
 
-    setAuth({
-      token: 'mock-jwt-token',
-      user: { username: cleanUsername },
-    });
+    try {
+      const { data } = await axios.post<AuthState>(
+        `${AUTH_URL}/${authMode}`,
+        { username: cleanUsername, password: cleanPassword },
+      );
+      setAuth(data);
+      localStorage.setItem('task-tracker-auth', JSON.stringify(data));
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setAuthError(error.response?.data?.message ?? 'Authentication failed');
+      } else {
+        setAuthError('Authentication failed');
+      }
+    }
   };
 
   const handleLogout = () => {
     setAuth({ token: null, user: null });
+    localStorage.removeItem('task-tracker-auth');
     setTasks([]);
     setUsername('');
     setPassword('');
@@ -157,7 +181,7 @@ export default function App() {
       const { data } = await axios.post<Task>(API_URL, {
         title,
         description: newDesc.trim(),
-      });
+      }, { headers: { Authorization: `Bearer ${auth.token}` } });
 
       setTasks((prev) => [data, ...prev]);
       setNewTitle('');
@@ -174,7 +198,7 @@ export default function App() {
     try {
       const { data } = await axios.patch<Task>(`${API_URL}/${id}`, {
         isCompleted: !taskToToggle.isCompleted,
-      });
+      }, { headers: { Authorization: `Bearer ${auth.token}` } });
 
       setTasks((prev) =>
         prev.map((task) => (task.id === id ? data : task))
@@ -204,7 +228,7 @@ export default function App() {
       const { data } = await axios.patch<Task>(`${API_URL}/${id}`, {
         title,
         description: editDesc.trim(),
-      });
+      }, { headers: { Authorization: `Bearer ${auth.token}` } });
 
       setTasks((prev) =>
         prev.map((task) => (task.id === id ? data : task))
@@ -217,7 +241,9 @@ export default function App() {
 
   const deleteTask = async (id: string) => {
     try {
-      await axios.delete(`${API_URL}/${id}`);
+      await axios.delete(`${API_URL}/${id}`, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
       setTasks((prev) => prev.filter((task) => task.id !== id));
     } catch (error) {
       console.error('Error deleting task:', error);
@@ -274,7 +300,7 @@ export default function App() {
                 letterSpacing: '-0.5px',
               }}
             >
-              Task Pro
+              {authMode === 'login' ? 'Welcome back' : 'Create your account'}
             </h1>
           </div>
 
@@ -352,9 +378,16 @@ export default function App() {
                 (e.currentTarget.style.transform = 'translateY(0)')
               }
             >
-              Sign In
+              <LogIn size={17} />
+              {authMode === 'login' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
+
+          {authError && (
+            <p style={{ color: colors.accentRed, fontSize: '0.85rem', margin: '1rem 0 0' }}>
+              {authError}
+            </p>
+          )}
 
           <p
             style={{
@@ -365,7 +398,17 @@ export default function App() {
               margin: '1.5rem 0 0 0',
             }}
           >
-            Try any username and password to get started
+            {authMode === 'login' ? 'Need an account?' : 'Already have an account?'}{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode(authMode === 'login' ? 'register' : 'login');
+                setAuthError('');
+              }}
+              style={{ color: colors.accentBlue, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+            >
+              {authMode === 'login' ? 'Register' : 'Sign in'}
+            </button>
           </p>
         </div>
       </div>
