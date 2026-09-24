@@ -22,8 +22,9 @@ import { AuthModule } from './auth/auth.module.js';
           autoLoadEntities: true,
           synchronize: !isProduction, // Crucial safety for production data
 
-          // ADJUSTMENT: Use standard TCP host connection configurations
-          host: isProduction ? '127.0.0.1' : (process.env.DB_HOST || 'localhost'),
+          host: isProduction
+            ? `/cloudsql/${process.env.CLOUD_SQL_CONNECTION_NAME}`
+            : (process.env.DB_HOST || 'localhost'),
           port: isProduction ? 5432 : parseInt(process.env.DB_PORT || '5433', 10),
           
           // Extra driver flags to ensure stability on Cloud Run container runtimes
