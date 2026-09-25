@@ -5,7 +5,7 @@ steps:
       'build',
       '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/nestjs-backend:$COMMIT_SHA',
       '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/nestjs-backend:latest',
-      '.'
+      './backend'
     ]
 
   # 2. Push the image to Artifact Registry
