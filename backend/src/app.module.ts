@@ -14,27 +14,19 @@ import { AuthModule } from './auth/auth.module.js';
       useFactory: () => {
         const isProduction = process.env.NODE_ENV === 'production';
         
-        const config: any = {
+        return {
           type: 'postgres',
+          host: isProduction ? 'localhost' : (process.env.DB_HOST || 'localhost'),
+          port: isProduction ? 5432 : parseInt(process.env.DB_PORT || '5432', 10),
           username: process.env.DB_USERNAME || 'postgres',
           password: process.env.DB_PASSWORD,
           database: process.env.DB_NAME || 'task_tracker_poc',
           autoLoadEntities: true,
           synchronize: !isProduction,
-          logging: isProduction ? false : true,
+          logging: !isProduction,
+          retryAttempts: 5,
+          retryDelay: 3000,
         };
-
-        if (isProduction) {
-          // Cloud Run: Use localhost (Cloud SQL proxy runs on localhost:5432)
-          config.host = 'localhost';
-          config.port = 5432;
-        } else {
-          // Local dev: Use TCP connection
-          config.host = process.env.DB_HOST || 'localhost';
-          config.port = parseInt(process.env.DB_PORT || '5432', 10);
-        }
-
-        return config;
       },
     }),
     
