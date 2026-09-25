@@ -24,10 +24,8 @@ import { AuthModule } from './auth/auth.module.js';
           autoLoadEntities: true,
           synchronize: !isProduction,
           logging: !isProduction,
-          // CRITICAL: Don't crash if DB isn't available on startup
-          retryAttempts: 10,
-          retryDelay: 2000,
-          connectTimeoutMS: 10000,
+          retryAttempts: 20,
+          retryDelay: 1000,
         };
       },
     }),
