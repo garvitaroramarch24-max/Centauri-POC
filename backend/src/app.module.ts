@@ -12,20 +12,19 @@ import { AuthModule } from './auth/auth.module.js';
     
     TypeOrmModule.forRootAsync({
       useFactory: () => {
-        const isProduction = process.env.NODE_ENV === 'production';
-        
         return {
           type: 'postgres',
-          host: isProduction ? 'localhost' : (process.env.DB_HOST || 'localhost'),
-          port: isProduction ? 5432 : parseInt(process.env.DB_PORT || '5432', 10),
+          host: 'localhost',  // Will be changed to public IP for Cloud Run
+          port: 5432,
           username: process.env.DB_USERNAME || 'postgres',
           password: process.env.DB_PASSWORD,
           database: process.env.DB_NAME || 'task_tracker_poc',
           autoLoadEntities: true,
-          synchronize: !isProduction,
-          logging: !isProduction,
-          retryAttempts: 20,
-          retryDelay: 1000,
+          synchronize: false,
+          logging: false,
+          retryAttempts: 5,
+          retryDelay: 2000,
+          ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
         };
       },
     }),

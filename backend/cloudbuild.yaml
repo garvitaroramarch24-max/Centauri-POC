@@ -24,10 +24,10 @@ steps:
       '--region', 'asia-south1',
       '--platform', 'managed',
       '--allow-unauthenticated',
-      '--set-env-vars', 'NODE_ENV=production,DB_USERNAME=postgres,DB_PASSWORD=Gcpowner@2403,DB_NAME=task_tracker_poc,CLOUD_SQL_CONNECTION_NAME=project-708e77f4-583e-48a4-807:asia-south1:postgres-instance',
-      '--add-cloudsql-instances', 'project-708e77f4-583e-48a4-807:asia-south1:postgres-instance',
+      '--set-env-vars', 'NODE_ENV=production,DB_USERNAME=postgres,DB_PASSWORD=Gcpowner@2403,DB_NAME=task_tracker_poc',
       '--max-instances', '1',
-      '--timeout', '180'
+      '--timeout', '180',
+      '--memory', '512Mi'
     ]
 
 images:
@@ -36,4 +36,4 @@ images:
 options:
   logging: CLOUD_LOGGING_ONLY
 
-serviceAccount: 'projects/project-708e77f4-583e-48a4-807/serviceAccounts/358045803121-compute@gserviceaccount.com'
+serviceAccount: 'projects/project-708e77f4-583e-48a4-807/serviceAccounts/358045803121-compute@developer.gserviceaccount.com'
