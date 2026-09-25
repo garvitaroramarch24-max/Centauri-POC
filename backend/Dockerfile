@@ -21,5 +21,6 @@ COPY --from=build /app/dist ./dist
 
 # CRITICAL FOR CLOUD RUN
 EXPOSE 8080
+ENV PORT=8080
 
 CMD ["node", "dist/main.js"]
