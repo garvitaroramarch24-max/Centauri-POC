@@ -14,7 +14,7 @@ import { AuthModule } from './auth/auth.module.js';
       useFactory: () => {
         return {
           type: 'postgres',
-          host: 'localhost',  // Will be changed to public IP for Cloud Run
+          host: '8.234.101.42',  // Will be changed to public IP for Cloud Run
           port: 5432,
           username: process.env.DB_USERNAME || 'postgres',
           password: process.env.DB_PASSWORD,
