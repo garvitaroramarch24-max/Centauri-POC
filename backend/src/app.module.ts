@@ -21,18 +21,17 @@ import { AuthModule } from './auth/auth.module.js';
           database: process.env.DB_NAME || 'task_tracker_poc',
           autoLoadEntities: true,
           synchronize: !isProduction,
+          logging: isProduction ? false : true,
         };
 
         if (isProduction) {
-          // Cloud SQL Unix socket - NO PORT needed
-          config.host = `/cloudsql/${process.env.CLOUD_SQL_CONNECTION_NAME}`;
-          config.extra = {
-            connectTimeoutMS: 10000,
-          };
+          // Cloud Run: Use localhost (Cloud SQL proxy runs on localhost:5432)
+          config.host = 'localhost';
+          config.port = 5432;
         } else {
-          // Local TCP connection
+          // Local dev: Use TCP connection
           config.host = process.env.DB_HOST || 'localhost';
-          config.port = parseInt(process.env.DB_PORT || '5433', 10);
+          config.port = parseInt(process.env.DB_PORT || '5432', 10);
         }
 
         return config;
