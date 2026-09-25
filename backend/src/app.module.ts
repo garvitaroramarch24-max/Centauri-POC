@@ -14,24 +14,28 @@ import { AuthModule } from './auth/auth.module.js';
       useFactory: () => {
         const isProduction = process.env.NODE_ENV === 'production';
         
-        return {
+        const config: any = {
           type: 'postgres',
           username: process.env.DB_USERNAME || 'postgres',
-          password: process.env.DB_PASSWORD || 'local_postgres_password',
+          password: process.env.DB_PASSWORD,
           database: process.env.DB_NAME || 'task_tracker_poc',
           autoLoadEntities: true,
-          synchronize: !isProduction, // Crucial safety for production data
-
-          host: isProduction
-            ? `/cloudsql/${process.env.CLOUD_SQL_CONNECTION_NAME}`
-            : (process.env.DB_HOST || 'localhost'),
-          port: isProduction ? 5432 : parseInt(process.env.DB_PORT || '5433', 10),
-          
-          // Extra driver flags to ensure stability on Cloud Run container runtimes
-          extra: isProduction ? {
-            connectTimeoutMS: 10000,
-          } : {},
+          synchronize: !isProduction,
         };
+
+        if (isProduction) {
+          // Cloud SQL Unix socket - NO PORT needed
+          config.host = `/cloudsql/${process.env.CLOUD_SQL_CONNECTION_NAME}`;
+          config.extra = {
+            connectTimeoutMS: 10000,
+          };
+        } else {
+          // Local TCP connection
+          config.host = process.env.DB_HOST || 'localhost';
+          config.port = parseInt(process.env.DB_PORT || '5433', 10);
+        }
+
+        return config;
       },
     }),
     
