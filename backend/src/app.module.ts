@@ -17,7 +17,7 @@ import { AuthModule } from './auth/auth.module.js';
           host: '8.234.101.42',  // Will be changed to public IP for Cloud Run
           port: 5432,
           username: process.env.DB_USERNAME || 'postgres',
-          password: process.env.DB_PASSWORD,
+          password: process.env.DB_PASSWORD|| 'Gcpowner@2403',
           database: process.env.DB_NAME || 'task_tracker_poc',
           autoLoadEntities: true,
           synchronize: false,
