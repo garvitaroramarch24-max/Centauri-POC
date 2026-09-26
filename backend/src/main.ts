@@ -5,7 +5,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
   app.enableCors({
-    origin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+    origin: process.env.FRONTEND_ORIGIN || 'https://centauri-poc-fe-358045803121.asia-south1.run.app',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
