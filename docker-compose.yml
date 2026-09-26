@@ -32,7 +32,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:3000
+        VITE_API_URL: https://centauri-poc-358045803121.asia-south1.run.app
     depends_on:
       - api
     ports:

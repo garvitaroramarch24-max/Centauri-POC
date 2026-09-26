@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { Task, AuthState } from './types';
 
-const API_ROOT = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_ROOT = import.meta.env.VITE_API_URL || 'https://centauri-poc-358045803121.asia-south1.run.app';
 const API_URL = `${API_ROOT}/tasks`;
 const AUTH_URL = `${API_ROOT}/auth`;
 

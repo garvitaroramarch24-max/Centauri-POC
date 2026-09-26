@@ -1,6 +1,6 @@
 FROM node:26-alpine AS build
 WORKDIR /app
-ARG VITE_API_URL=http://localhost:3000
+ARG VITE_API_URL=https://centauri-poc-358045803121.asia-south1.run.app
 ENV VITE_API_URL=$VITE_API_URL
 COPY package*.json ./
 RUN npm ci
