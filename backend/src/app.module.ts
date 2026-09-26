@@ -20,7 +20,7 @@ import { AuthModule } from './auth/auth.module.js';
           password: process.env.DB_PASSWORD|| 'Gcpowner@2403',
           database: process.env.DB_NAME || 'task_tracker_poc',
           autoLoadEntities: true,
-          synchronize: false,
+          synchronize: true,
           logging: false,
           retryAttempts: 5,
           retryDelay: 2000,
