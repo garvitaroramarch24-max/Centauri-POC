@@ -8,6 +8,7 @@ import {
   CheckCircle,
   Circle,
   Edit2,
+  Search,
   Save,
   X,
   Zap,
@@ -111,6 +112,10 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusSelection, setStatusSelection] = useState<'all' | 'open' | 'completed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'completed'>('all');
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -118,21 +123,37 @@ export default function App() {
 
   const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (): Promise<Task[]> => {
+    const { data } = await axios.get<Task[]>(API_URL, {
+      headers: { Authorization: `Bearer ${auth.token}` },
+      params: { q: searchQuery || undefined, status: statusFilter },
+    });
+    return data;
+  }, [auth.token, searchQuery, statusFilter]);
+
+  const refreshTasks = async () => {
     try {
-      const { data } = await axios.get<Task[]>(API_URL, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      });
-      setTasks(data);
+      setTasks(await fetchTasks());
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
-  }, [auth.token]);
+  };
 
   useEffect(() => {
-    if (auth.token) {
-      fetchTasks();
-    }
+    if (!auth.token) return;
+
+    let isCurrentRequest = true;
+    void fetchTasks()
+      .then((data) => {
+        if (isCurrentRequest) setTasks(data);
+      })
+      .catch((error: unknown) => {
+        console.error('Error fetching tasks:', error);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
   }, [auth.token, fetchTasks]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -178,14 +199,14 @@ export default function App() {
     if (!title) return;
 
     try {
-      const { data } = await axios.post<Task>(API_URL, {
+      await axios.post<Task>(API_URL, {
         title,
         description: newDesc.trim(),
       }, { headers: { Authorization: `Bearer ${auth.token}` } });
 
-      setTasks((prev) => [data, ...prev]);
       setNewTitle('');
       setNewDesc('');
+      await refreshTasks();
     } catch (error) {
       console.error('Error creating task:', error);
     }
@@ -196,13 +217,11 @@ export default function App() {
     if (!taskToToggle) return;
 
     try {
-      const { data } = await axios.patch<Task>(`${API_URL}/${id}`, {
+      await axios.patch<Task>(`${API_URL}/${id}`, {
         isCompleted: !taskToToggle.isCompleted,
       }, { headers: { Authorization: `Bearer ${auth.token}` } });
 
-      setTasks((prev) =>
-        prev.map((task) => (task.id === id ? data : task))
-      );
+      await refreshTasks();
     } catch (error) {
       console.error('Error updating task status:', error);
     }
@@ -225,15 +244,13 @@ export default function App() {
     if (!title) return;
 
     try {
-      const { data } = await axios.patch<Task>(`${API_URL}/${id}`, {
+      await axios.patch<Task>(`${API_URL}/${id}`, {
         title,
         description: editDesc.trim(),
       }, { headers: { Authorization: `Bearer ${auth.token}` } });
 
-      setTasks((prev) =>
-        prev.map((task) => (task.id === id ? data : task))
-      );
       cancelEdit();
+      await refreshTasks();
     } catch (error) {
       console.error('Error saving task updates:', error);
     }
@@ -499,7 +516,7 @@ export default function App() {
               }}
             >
               <p style={{ margin: 0, fontSize: '0.875rem', color: colors.textMuted }}>
-                Total Tasks
+                Tasks shown
               </p>
               <p
                 style={{
@@ -520,7 +537,7 @@ export default function App() {
               }}
             >
               <p style={{ margin: 0, fontSize: '0.875rem', color: colors.textMuted }}>
-                Completed
+                Completed shown
               </p>
               <p
                 style={{
@@ -617,6 +634,72 @@ export default function App() {
           </form>
         </section>
 
+        {/* Search and status filters */}
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSearchQuery(searchText.trim());
+            setStatusFilter(statusSelection);
+          }}
+          style={{
+            ...styles.card,
+            padding: '1rem',
+            marginBottom: '1rem',
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(130px, 180px)',
+            gap: '0.75rem',
+            alignItems: 'end',
+          }}
+        >
+          <label style={{ display: 'grid', gap: '0.4rem', color: colors.textMuted, fontSize: '0.8rem' }}>
+            Search tasks
+            <input
+              type="search"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Title or description"
+              style={{ ...styles.input, padding: '0.65rem' }}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: '0.4rem', color: colors.textMuted, fontSize: '0.8rem' }}>
+            Status
+            <select
+              value={statusSelection}
+              onChange={(event) => setStatusSelection(event.target.value as typeof statusSelection)}
+              style={{ ...styles.input, padding: '0.65rem', background: colors.surface }}
+            >
+              <option value="all">All tasks</option>
+              <option value="open">Open</option>
+              <option value="completed">Completed</option>
+            </select>
+          </label>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+            <button
+              type="submit"
+              style={{ ...styles.buttonPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', padding: '0.75rem 1rem' }}
+            >
+              <Search size={16} />
+              Search
+            </button>
+            {(searchQuery || statusFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchText('');
+                  setSearchQuery('');
+                  setStatusSelection('all');
+                  setStatusFilter('all');
+                }}
+                style={{ ...styles.iconButton, color: colors.textMuted, padding: '0.75rem' }}
+                title="Clear filters"
+                aria-label="Clear filters"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+        </form>
+
         {/* Tasks List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {tasks.length === 0 ? (
@@ -628,7 +711,9 @@ export default function App() {
               }}
             >
               <p style={{ margin: 0, color: colors.textMuted, fontSize: '1rem' }}>
-                No tasks yet. Create one above to get started.
+                {searchQuery || statusFilter !== 'all'
+                  ? 'No tasks match these filters.'
+                  : 'No tasks yet. Create one above to get started.'}
               </p>
             </div>
           ) : (

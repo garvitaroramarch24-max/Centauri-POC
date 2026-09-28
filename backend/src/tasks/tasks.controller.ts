@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { TasksService } from './tasks.service.js'; 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 
@@ -9,8 +9,12 @@ export class TasksController {
 
   // 2. GET http://localhost:3000/tasks -> Fetches all tasks
   @Get()
-  getAllTasks(@Req() request: { user: { sub: string } }) {
-    return this.tasksService.findAll(request.user.sub);
+  getAllTasks(
+    @Req() request: { user: { sub: string } },
+    @Query('q') query?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.tasksService.findAll(request.user.sub, { query, status });
   }
 
   // 3. POST http://localhost:3000/tasks -> Creates a new task

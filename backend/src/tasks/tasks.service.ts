@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { TaskEntity } from './task.entity.js'; 
 import { UserEntity } from '../auth/user.entity.js';
 
@@ -14,12 +14,40 @@ export class TasksService {
     private readonly userRepository: Repository<UserEntity>,
   ) {}
 
-  // 2. READ: Fetch all tasks sorted by the newest first
-  async findAll(userId: string): Promise<TaskEntity[]> {
+  async findAll(
+    userId: string,
+    filters: { query?: string; status?: string } = {},
+  ): Promise<TaskEntity[]> {
+    const isCompleted = this.getCompletionFilter(filters.status);
+    const searchTerm = filters.query?.trim().replace(/[\\%_]/g, '\\$&');
+    const ownerFilter = {
+      owner: { id: userId },
+      ...(isCompleted === undefined ? {} : { isCompleted }),
+    };
+    const where = searchTerm
+      ? [
+          { ...ownerFilter, title: ILike(`%${searchTerm}%`) },
+          { ...ownerFilter, description: ILike(`%${searchTerm}%`) },
+        ]
+      : [ownerFilter];
+
     return this.taskRepository.find({
-      where: { owner: { id: userId } },
+      where,
       order: { createdAt: 'DESC' },
     });
+  }
+
+  private getCompletionFilter(status = 'all'): boolean | undefined {
+    switch (status) {
+      case 'all':
+        return undefined;
+      case 'open':
+        return false;
+      case 'completed':
+        return true;
+      default:
+        throw new BadRequestException('Status must be all, open, or completed');
+    }
   }
 
   // 3. CREATE: Insert a new task record into the database
