@@ -1,0 +1,17 @@
+ git diff  780fb8e~ ce015c3                             
+PS C:\Users\garvit.arora\Desktop\POC-1ST-WEEK> git show --name-status 780fb8e
+commit 780fb8e48246a899d0011e4ac15f4c38e27c7e9a (HEAD -> main, origin/main)
+Author: garvit arora <garvit2205.be21@chitkara.edu.in>
+Date:   Mon Sep 28 15:59:58 2026 +0530
+
+    week 3 poc
+
+M       backend/README.md
+A       backend/src/tasks/tasks.controller.spec.ts
+A       backend/src/tasks/tasks.service.spec.ts
+M       backend/src/tasks/tasks.service.ts
+M       backend/tsconfig.build.tsbuildinfo
+M       frontend/src/App.tsx
+
+
+
