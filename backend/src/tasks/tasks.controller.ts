@@ -17,6 +17,18 @@ export class TasksController {
     return this.tasksService.findAll(request.user.sub, { query, status });
   }
 
+  @Get('summary')
+  async getTaskSummary(@Req() request: { user: { sub: string } }) {
+    const tasks = await this.tasksService.findAll(request.user.sub);
+    const completed = tasks.filter((task) => task.isCompleted).length;
+
+    return {
+      total: tasks.length,
+      completed,
+      open: tasks.length - completed,
+    };
+  }
+
   // 3. POST http://localhost:3000/tasks -> Creates a new task
   @Post()
   createTask(

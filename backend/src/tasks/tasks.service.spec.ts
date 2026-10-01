@@ -6,14 +6,29 @@ import { UserEntity } from '../auth/user.entity.js';
 
 describe('TasksService search and filters', () => {
   const find = vi.fn();
+  const findOne = vi.fn();
+  const findOneByOrFail = vi.fn();
+  const create = vi.fn();
+  const save = vi.fn();
+  const notificationsService = {
+    notifyTaskCreated: vi.fn(),
+    notifyTaskCompleted: vi.fn(),
+  };
   let service: TasksService;
 
   beforeEach(() => {
     find.mockReset();
     find.mockResolvedValue([]);
+    findOne.mockReset();
+    findOneByOrFail.mockReset();
+    create.mockReset();
+    save.mockReset();
+    notificationsService.notifyTaskCreated.mockReset();
+    notificationsService.notifyTaskCompleted.mockReset();
     service = new TasksService(
-      { find } as unknown as Repository<TaskEntity>,
-      {} as Repository<UserEntity>,
+      { find, findOne, create, save } as unknown as Repository<TaskEntity>,
+      { findOneByOrFail } as unknown as Repository<UserEntity>,
+      notificationsService,
     );
   });
 
@@ -56,5 +71,32 @@ describe('TasksService search and filters', () => {
       BadRequestException,
     );
     expect(find).not.toHaveBeenCalled();
+  });
+
+  it('notifies the owner after creating a task', async () => {
+    const task = { title: 'Review proposal' } as TaskEntity;
+    findOneByOrFail.mockResolvedValue({ id: 'owner-1' });
+    create.mockReturnValue(task);
+    save.mockResolvedValue(task);
+
+    await service.create('owner-1', task.title);
+
+    expect(notificationsService.notifyTaskCreated).toHaveBeenCalledWith(
+      'owner-1',
+      task.title,
+    );
+  });
+
+  it('notifies the owner when a task is first completed', async () => {
+    const task = { id: 'task-1', title: 'Review proposal', isCompleted: false } as TaskEntity;
+    findOne.mockResolvedValue(task);
+    save.mockResolvedValue({ ...task, isCompleted: true });
+
+    await service.update('task-1', 'owner-1', { isCompleted: true });
+
+    expect(notificationsService.notifyTaskCompleted).toHaveBeenCalledWith(
+      'owner-1',
+      task.title,
+    );
   });
 });

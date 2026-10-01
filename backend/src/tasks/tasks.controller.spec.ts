@@ -56,4 +56,15 @@ describe('TasksController search endpoint', () => {
       status: undefined,
     });
   });
+
+  it('returns a summary for the authenticated owner', async () => {
+    findAll.mockResolvedValueOnce([{ isCompleted: true }, { isCompleted: false }]);
+
+    await request(app.getHttpServer())
+      .get('/tasks/summary')
+      .expect(200)
+      .expect({ total: 2, completed: 1, open: 1 });
+
+    expect(findAll).toHaveBeenCalledWith('owner-1');
+  });
 });

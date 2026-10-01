@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { TaskEntity } from './task.entity.js'; 
 import { UserEntity } from '../auth/user.entity.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class TasksService {
@@ -12,6 +13,7 @@ export class TasksService {
     private readonly taskRepository: Repository<TaskEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(
@@ -54,7 +56,9 @@ export class TasksService {
   async create(userId: string, title: string, description?: string): Promise<TaskEntity> {
     const owner = await this.userRepository.findOneByOrFail({ id: userId });
     const newTask = this.taskRepository.create({ title, description, owner });
-    return this.taskRepository.save(newTask);
+    const task = await this.taskRepository.save(newTask);
+    await this.notificationsService.notifyTaskCreated(userId, task.title);
+    return task;
   }
 
   // 4. UPDATE: Change fields of an existing task matching an ID
@@ -64,8 +68,13 @@ export class TasksService {
       throw new NotFoundException(`Task with ID ${id} not found`);
     }
     
+    const wasCompleted = task.isCompleted;
     Object.assign(task, attrs);
-    return this.taskRepository.save(task);
+    const updatedTask = await this.taskRepository.save(task);
+    if (!wasCompleted && updatedTask.isCompleted) {
+      await this.notificationsService.notifyTaskCompleted(userId, updatedTask.title);
+    }
+    return updatedTask;
   }
 
   // 5. DELETE: Remove the task row from the database completely

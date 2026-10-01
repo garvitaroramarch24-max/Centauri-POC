@@ -7,9 +7,10 @@ import { TasksController } from './tasks.controller.js';
 import { TaskEntity } from './task.entity.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { UserEntity } from '../auth/user.entity.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TaskEntity, UserEntity]), AuthModule], // Registers the table repository inside this feature
+  imports: [TypeOrmModule.forFeature([TaskEntity, UserEntity]), AuthModule, NotificationsModule], // Registers the table repository inside this feature
   controllers: [TasksController],
   providers: [TasksService],
 })
