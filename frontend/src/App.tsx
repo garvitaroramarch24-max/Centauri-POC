@@ -12,8 +12,9 @@ import {
   Save,
   X,
   Zap,
+  Bell,
 } from 'lucide-react';
-import type { Task, AuthState } from './types';
+import type { Task, AuthState, Notification } from './types';
 
 const API_ROOT = import.meta.env.VITE_API_URL || 'https://centauri-poc-358045803121.asia-south1.run.app';
 const API_URL = `${API_ROOT}/tasks`;
@@ -110,6 +111,8 @@ export default function App() {
   const [password, setPassword] = useState('');
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [searchText, setSearchText] = useState('');
@@ -130,6 +133,13 @@ export default function App() {
     });
     return data;
   }, [auth.token, searchQuery, statusFilter]);
+
+  const fetchNotifications = useCallback(async (): Promise<Notification[]> => {
+    const { data } = await axios.get<Notification[]>(`${API_ROOT}/notifications`, {
+      headers: { Authorization: `Bearer ${auth.token}` },
+    });
+    return data;
+  }, [auth.token]);
 
   const refreshTasks = async () => {
     try {
@@ -155,6 +165,31 @@ export default function App() {
       isCurrentRequest = false;
     };
   }, [auth.token, fetchTasks]);
+
+  useEffect(() => {
+    if (!auth.token) {
+      setNotifications([]);
+      return;
+    }
+
+    let isCurrentRequest = true;
+    const refreshNotifications = () => {
+      void fetchNotifications()
+        .then((data) => {
+          if (isCurrentRequest) setNotifications(data);
+        })
+        .catch((error: unknown) => {
+          console.error('Error fetching notifications:', error);
+        });
+    };
+
+    refreshNotifications();
+    const intervalId = window.setInterval(refreshNotifications, 30000);
+    return () => {
+      isCurrentRequest = false;
+      window.clearInterval(intervalId);
+    };
+  }, [auth.token, fetchNotifications]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,6 +220,8 @@ export default function App() {
     setAuth({ token: null, user: null });
     localStorage.removeItem('task-tracker-auth');
     setTasks([]);
+    setNotifications([]);
+    setNotificationsOpen(false);
     setUsername('');
     setPassword('');
     setEditingId(null);
@@ -207,6 +244,7 @@ export default function App() {
       setNewTitle('');
       setNewDesc('');
       await refreshTasks();
+      setNotifications(await fetchNotifications());
     } catch (error) {
       console.error('Error creating task:', error);
     }
@@ -222,6 +260,7 @@ export default function App() {
       }, { headers: { Authorization: `Bearer ${auth.token}` } });
 
       await refreshTasks();
+      setNotifications(await fetchNotifications());
     } catch (error) {
       console.error('Error updating task status:', error);
     }
@@ -264,6 +303,23 @@ export default function App() {
       setTasks((prev) => prev.filter((task) => task.id !== id));
     } catch (error) {
       console.error('Error deleting task:', error);
+    }
+  };
+
+  const markNotificationRead = async (notification: Notification) => {
+    if (notification.isRead) return;
+
+    try {
+      const { data } = await axios.patch<Notification>(
+        `${API_ROOT}/notifications/${notification.id}/read`,
+        {},
+        { headers: { Authorization: `Bearer ${auth.token}` } },
+      );
+      setNotifications((current) =>
+        current.map((item) => item.id === data.id ? data : item),
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
     }
   };
 
@@ -433,6 +489,7 @@ export default function App() {
   }
 
   const completedCount = tasks.filter((t) => t.isCompleted).length;
+  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
 
   return (
     <div
@@ -478,25 +535,110 @@ export default function App() {
             </p>
           </div>
 
-          <button
-            onClick={handleLogout}
-            style={{
-              ...styles.buttonDanger,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.opacity = '0.85')
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.opacity = '1')
-            }
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setNotificationsOpen((open) => !open)}
+              aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+              aria-expanded={notificationsOpen}
+              style={{ ...styles.iconButton, position: 'relative', color: colors.textMuted }}
+              title="Notifications"
+            >
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  minWidth: '16px',
+                  height: '16px',
+                  padding: '0 3px',
+                  borderRadius: '8px',
+                  background: colors.accentRed,
+                  color: '#fff',
+                  fontSize: '0.65rem',
+                  lineHeight: '16px',
+                  textAlign: 'center',
+                  boxSizing: 'border-box',
+                }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={handleLogout}
+              style={{
+                ...styles.buttonDanger,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.opacity = '0.85')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.opacity = '1')
+              }
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
+          </div>
         </header>
+
+        {notificationsOpen && (
+          <section
+            aria-label="Notifications"
+            style={{
+              ...styles.card,
+              padding: '1rem',
+              marginTop: '-2rem',
+              marginBottom: '1.5rem',
+              maxHeight: 'min(360px, 50vh)',
+              overflowY: 'auto',
+            }}
+          >
+            <h2 style={{ margin: '0 0 0.75rem', fontSize: '1rem', color: colors.text }}>
+              Notifications
+            </h2>
+            {notifications.length === 0 ? (
+              <p style={{ margin: 0, color: colors.textMuted, fontSize: '0.875rem' }}>
+                No notifications yet.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {notifications.map((notification) => (
+                  <button
+                    key={notification.id}
+                    type="button"
+                    onClick={() => markNotificationRead(notification)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: `1px solid ${colors.border}`,
+                      borderRadius: '6px',
+                      background: notification.isRead ? colors.surface : '#f0f6ff',
+                      color: colors.text,
+                      textAlign: 'left',
+                      cursor: notification.isRead ? 'default' : 'pointer',
+                    }}
+                  >
+                    <span style={{ display: 'block', fontSize: '0.875rem' }}>
+                      {notification.message}
+                    </span>
+                    <time
+                      dateTime={notification.createdAt}
+                      style={{ display: 'block', marginTop: '0.35rem', color: colors.textMuted, fontSize: '0.75rem' }}
+                    >
+                      {new Date(notification.createdAt).toLocaleString()}
+                      {!notification.isRead && ' · New'}
+                    </time>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Stats */}
         {tasks.length > 0 && (

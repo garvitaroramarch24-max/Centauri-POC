@@ -7,6 +7,14 @@ export interface Task {
   createdAt: string;
 }
 
+export interface Notification {
+  id: string;
+  type: 'task_created' | 'task_completed';
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export interface AuthState {
   token: string | null;
   user: { username: string } | null;
